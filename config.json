@@ -1,0 +1,11 @@
+{
+  "pairs": ["XBTEUR", "ETHEUR"],
+  "start_capital_eur": 10000,
+  "sma_days": 200,
+  "atr_days": 14,
+  "atr_stop_mult": 3,
+  "risk_per_trade": 0.01,
+  "max_position_share": 0.5,
+  "max_drawdown": 0.15,
+  "fee_rate": 0.0026
+}

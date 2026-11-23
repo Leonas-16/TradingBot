@@ -1,0 +1,29 @@
+name: Paper-Bot täglich
+
+on:
+  schedule:
+    - cron: "15 0 * * *"   # täglich 00:15 UTC, kurz nach Tagesschluss bei Kraken
+  workflow_dispatch: {}     # manuell startbar unter "Actions"
+
+permissions:
+  contents: write
+
+concurrency: paper-bot
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Bot ausführen
+        run: python bot/paper_bot.py
+      - name: Ergebnisse speichern
+        run: |
+          git config user.name "paper-bot"
+          git config user.email "paper-bot@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet || git commit -m "Paper-Bot Lauf $(date -u +%Y-%m-%d)"
+          git push
