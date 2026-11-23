@@ -1,0 +1,10 @@
+{
+  "cash": 10000,
+  "positions": {},
+  "peak_equity": 10000,
+  "halted": false,
+  "benchmark_start": {
+    "XBTEUR": 55803.4,
+    "ETHEUR": 1569.28
+  }
+}
