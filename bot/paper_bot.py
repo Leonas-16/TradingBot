@@ -1,4 +1,7 @@
-"""Täglicher Paper-Trading-Bot: Trendfilter (200-Tage-Durchschnitt) mit ATR-Stop.
+"""Täglicher Paper-Trading-Bot: Trendfilter (200-Tage-Durchschnitt) mit ATR-Stop (Variante D).
+
+Nach einem Stop wird erst wieder gekauft, wenn der Kurs einmal unter den
+200-Tage-Schnitt gefallen ist (kein sofortiger Wiedereinstieg).
 
 Handelt nur virtuelles Geld. Holt öffentliche Tageskerzen von Kraken
 (kein Konto, kein API-Key) und speichert Depot, Trades und Kontoverlauf
@@ -64,7 +67,7 @@ def load_state() -> dict:
         return json.loads(path.read_text())
     return {"cash": CONFIG["start_capital_eur"], "positions": {},
             "peak_equity": CONFIG["start_capital_eur"], "halted": False,
-            "benchmark_start": {}}
+            "benchmark_start": {}, "blocked": {}}
 
 
 def save_state(state: dict) -> None:
@@ -99,7 +102,11 @@ def decide(candles: list[dict], position: dict | None) -> tuple[str, dict]:
     if position:
         new_stop = max(position["stop"], price - CONFIG["atr_stop_mult"] * vol)
         info["stop"] = new_stop
-        if candles[-1]["low"] <= position["stop"] or price < trend:
+        if candles[-1]["low"] <= position["stop"]:
+            info["reason"] = "stop"
+            return "sell", info
+        if price < trend:
+            info["reason"] = "trend"
             return "sell", info
         return "hold", info
     if price > trend:
@@ -109,7 +116,9 @@ def decide(candles: list[dict], position: dict | None) -> tuple[str, dict]:
 
 
 def position_size(eq: float, price: float, stop: float, cash: float) -> float:
-    """Menge so, dass ein Stop höchstens risk_per_trade des Kontos kostet."""
+    """Voll investiert (max_position_share pro Coin) oder risikobasiert."""
+    if CONFIG.get("sizing") == "full":
+        return max(0.0, min(cash, eq * CONFIG["max_position_share"]) / (price * (1 + CONFIG["fee_rate"])))
     risk_eur = eq * CONFIG["risk_per_trade"]
     per_unit = max(price - stop, price * 0.01)
     qty = risk_eur / per_unit
@@ -125,6 +134,7 @@ def run(market: dict[str, list[dict]] | None = None, today: str | None = None) -
     prices = {s: c[-1]["close"] for s, c in market.items()}
     for s, p in prices.items():
         state["benchmark_start"].setdefault(s, p)
+    state.setdefault("blocked", {})
 
     fee = CONFIG["fee_rate"]
     log = []
@@ -138,11 +148,18 @@ def run(market: dict[str, list[dict]] | None = None, today: str | None = None) -
         pos = state["positions"].get(sym)
         action, info = decide(candles, pos)
         price = info["price"]
+        if info["sma"] is not None and price < info["sma"]:
+            state["blocked"].pop(sym, None)  # Kurs fiel unter den Schnitt: Wiedereinstieg wieder erlaubt
+        if action == "buy" and state["blocked"].get(sym):
+            action = "hold"
+            log.append(f"{sym}: nach Stop gesperrt, warte auf Rückfall unter den Schnitt")
         if action == "sell" and pos:
             proceeds = pos["qty"] * price * (1 - fee)
             state["cash"] += proceeds
             pnl = proceeds - pos["cost"]
             del state["positions"][sym]
+            if info.get("reason") == "stop" and CONFIG.get("rearm_after_stop"):
+                state["blocked"][sym] = True
             append_csv("trades.csv", ["date", "pair", "side", "qty", "price", "eur", "pnl_eur"],
                        [today, sym, "sell", f"{pos['qty']:.8f}", f"{price:.2f}", f"{proceeds:.2f}", f"{pnl:.2f}"])
             log.append(f"VERKAUF {sym} zu {price:.2f} €, Ergebnis {pnl:+.2f} €")
