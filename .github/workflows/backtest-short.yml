@@ -1,0 +1,21 @@
+name: Backtest Long vs Short
+
+on:
+  push:
+    branches: [backtest-short]
+    paths: ["backtest/**", ".github/workflows/backtest-short.yml"]
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Backtest rechnen
+        run: python backtest/backtest_short.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backtest-ergebnis
+          path: backtest/results/
