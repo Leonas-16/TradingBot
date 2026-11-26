@@ -9,7 +9,7 @@
   "atr_stop_mult": 5,
   "risk_per_trade": 0.01,
   "max_position_share": 0.5,
-  "max_drawdown": 0.15,
+  "max_drawdown": 0.45,
   "fee_rate": 0.0026,
   "sizing": "full",
   "rearm_after_stop": true
