@@ -14,7 +14,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Backtest rechnen
-        run: python backtest/backtest_short.py
+        run: |
+          python backtest/backtest_short.py
+          python backtest/backtest_variants.py
       - uses: actions/upload-artifact@v4
         with:
           name: backtest-ergebnis
